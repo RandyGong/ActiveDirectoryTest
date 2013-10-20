@@ -18,9 +18,72 @@ namespace ActiveDirectoryTest
 
             //CreateLocalUser("userFromCode", "abcd1234*", "");
             //SetEnable("userFromCode");
-            EnableUser("userFromCode");
+            //EnableUser("userFromCode");
             //adduser("userFromCodeLater");
+            //GetUser();
+            //EnumComputers();
+            //EnumUsers();
+            ListUsers();
+            //changeSystePassWord("admin", "1234abcd*");
+            //var lenovo = GetDirectoryEntryByAccount("admin");
+            //FindUser("lenovo");
             Console.Read();
+        }
+
+        public static string userName = "admin";
+        public static string pwd = "abcd1234*";
+
+        public static void GetUser()
+        {
+            DirectorySearcher search = new DirectorySearcher(
+               new DirectoryEntry("WinNT://LENOVO-PC", userName, pwd),
+               "(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2))((mail=*)))", // filter out disabled accounts
+               new string[] { "givenName", "sn", "mail", "telephoneNumber", "l", "company", "memberOf", "userPrincipalName", "userAccountControl", "lastLogonTimestamp", "departmentNumber", "department", "description", "info", "mobile" }, SearchScope.OneLevel); // search only the current level
+            var res = search.FindAll();
+
+        }
+
+        static void EnumComputers()
+        {
+            using (DirectoryEntry root = new DirectoryEntry("WinNT:"))
+            {
+                foreach (DirectoryEntry domain in root.Children)
+                {
+                    Console.WriteLine("Domain | WorkGroup:\t" + domain.Name);
+                    foreach (DirectoryEntry computer in domain.Children)
+                    {
+                        Console.WriteLine("Computer:\t" + computer.Name);
+                    }
+                }
+            }
+        }
+
+        static void EnumUsers()
+        {
+            //System.DirectoryServices.DirectoryEntry pEntry = new System.DirectoryServices.DirectoryEntry("WinNT://" + Environment.MachineName + ",computer");
+            //System.DirectoryServices.DirectoryEntry ADuser = pEntry.Children.Find(username, "user");
+            using (DirectoryEntry root = new DirectoryEntry("WinNT://" + Environment.MachineName + ",computer"))
+            {
+                foreach (DirectoryEntry domain in root.Children)
+                {
+                    if (domain.SchemaClassName == "User")
+                        Console.WriteLine("Domain | Name:\t" + domain.Name);
+
+                }
+            }
+        }
+
+        /// 要修改的用户的用户名
+        /// 修改后的新密码
+        static public void changeSystePassWord(string username, string newpassword)
+        {
+            System.DirectoryServices.DirectoryEntry pEntry = new System.DirectoryServices.DirectoryEntry("WinNT://" + Environment.MachineName + ",computer");
+            System.DirectoryServices.DirectoryEntry ADuser = pEntry.Children.Find(username, "user");
+            if (ADuser != null && ADuser.SchemaClassName == "User")
+            {
+                ADuser.Password = newpassword;
+                ADuser.CommitChanges();
+            }
         }
 
         /// 获得DirectoryEntry对象实例,以管理员登陆AD
@@ -32,13 +95,68 @@ namespace ActiveDirectoryTest
             try
             {
                 //entry = new DirectoryEntry("LDAP://localhost", "GongJiChang", "abcd1234*", AuthenticationTypes.Secure);
-                entry = new DirectoryEntry("WinNT://localhost", "Administrator", "abcd1234*", AuthenticationTypes.Secure);
+                entry = new DirectoryEntry("WinNT://LENOVO-PC", userName, pwd, AuthenticationTypes.Secure);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
             }
             return entry;
+        }
+
+        public static void ListUsers()
+        {
+            //DirectoryEntry entry = new DirectoryEntry(path);
+            var entry = GetDirectoryObject();
+            DirectorySearcher searcher = new DirectorySearcher(entry);
+            searcher.Filter = "(objectClass=*)";
+            searcher.PropertiesToLoad.Clear();
+            SearchResultCollection searchResultCollection = searcher.FindAll();
+            IList<Users> list = VisitSearchResultCollection(searchResultCollection);
+
+            foreach (var s in list)
+            {
+                Console.WriteLine(s);
+            }
+        }
+
+        public static IList<Users> VisitSearchResultCollection(SearchResultCollection resultCollection)
+        {
+            IList<Users> userList = new List<Users>();
+            foreach (SearchResult result in resultCollection)
+            {
+                string userName = string.Empty;
+                string displayName = string.Empty;
+                if (result.Properties.Contains("samaccountname"))
+                {
+                    ResultPropertyValueCollection resultValue = result.Properties["samaccountname"];
+                    if (resultValue != null && resultValue.Count > 0 && resultValue[0] != null)
+                    {
+                        userName = resultValue[0].ToString();
+                    }
+                }
+                if (result.Properties.Contains("displayname"))
+                {
+                    ResultPropertyValueCollection resultValue = result.Properties["displayname"];
+                    if (resultValue != null && resultValue.Count > 0 && resultValue[0] != null)
+                    {
+                        displayName = resultValue[0].ToString();
+                    }
+                }
+                userList.Add(new Users(userName, displayName));
+            }
+            return userList;
+        }
+
+        public class Users
+        {
+            public Users(string un, string dn)
+            {
+                userName = un;
+                displayName = dn;
+            }
+            public string userName { get; set; }
+            public string displayName { get; set; }
         }
 
         /// <summary>
@@ -151,6 +269,57 @@ namespace ActiveDirectoryTest
             {
                 return false;
             }
+        }
+
+        /// 
+
+        /// 根据用户帐号称取得用户的 对象
+
+        /// 
+
+        /// 用户帐号名
+
+        /// 如果找到该用户，则返回用户的 对象；否则返回 null
+
+        public static DirectoryEntry GetDirectoryEntryByAccount(string sAMAccountName)
+        {
+
+            DirectoryEntry de = GetDirectoryObject();
+
+            DirectorySearcher deSearch = new DirectorySearcher(de);
+
+            deSearch.Filter = "(&(&(objectCategory=person)(objectClass=user))(sAMAccountName=" + sAMAccountName + "))";
+
+            deSearch.SearchScope = SearchScope.Subtree;
+
+
+
+            try
+            {
+
+                SearchResult result = deSearch.FindOne();
+
+                de = new DirectoryEntry(result.Path);
+
+                return de;
+
+            }
+
+            catch
+            {
+
+                return null;
+
+            }
+
+        }
+
+        public static void FindUser(string username)
+        {
+            System.DirectoryServices.DirectoryEntry pEntry = new System.DirectoryServices.DirectoryEntry("WinNT://" + Environment.MachineName + ",computer");
+            System.DirectoryServices.DirectoryEntry ADuser = pEntry.Children.Find(username, "user");
+
+
         }
     }
 }

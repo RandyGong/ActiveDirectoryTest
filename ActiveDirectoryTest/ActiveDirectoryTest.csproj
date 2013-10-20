@@ -42,6 +42,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ADService.cs" />
     <Compile Include="ADS_USER_FLAG_ENUM.cs" />
     <Compile Include="IdentityImpersonation.cs" />
     <Compile Include="Program.cs" />
